@@ -1,0 +1,2 @@
+# cmd.exe leest batchbestanden met LF-regeleinden niet betrouwbaar (labels/goto)
+*.cmd text eol=crlf

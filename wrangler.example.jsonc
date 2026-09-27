@@ -1,0 +1,41 @@
+{
+  // Sjabloon. `npm run setup` maakt hier wrangler.jsonc van en vult de database-ID in.
+  // Heb je meerdere Cloudflare-accounts, zet dan ook "account_id" (zie `npx wrangler whoami`).
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "vinylhunter",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  // Eigen adres: https://<name>.<jouw-subdomein>.workers.dev
+  "workers_dev": true,
+  "preview_urls": false,
+  "d1_databases": [
+    { "binding": "DB", "database_name": "vinylhunter", "database_id": "VUL-IN-DOOR-SETUP" }
+  ],
+  // Pakt elke minuut scans op die door de Discogs-limiet of een fout zijn blijven liggen.
+  "triggers": { "crons": ["* * * * *"] },
+  "vars": {
+    // Herkenning: eerst MODEL; vindt Discogs daarmee niets, dan nog één keer FALLBACK_MODEL. Gemeten op
+    // 28 testfoto's: Sonnet 5 27/28 (~$0,005 per foto), Opus 5 28/28 (~$0,012 per foto).
+    "MODEL": "claude-sonnet-5",
+    "FALLBACK_MODEL": "claude-opus-5",
+    // Vangnet tegen kosten als je wachtwoord uitlekt: elke foto is een Claude-aanroep. 5000 is ruim genoeg
+    // voor een sessie van ~1000 platen (≈ 2.500 foto's); slechtste geval ~$29 per dag.
+    "DAILY_SCAN_CAP": "5000",
+    // Keramiek, zilver en overig: Opus 5 beoordeelt de foto's met de naslag in src/naslag.js. PRIJSCHECK
+    // "aan" = interessante stukken daarna laten checken met web search (~$0,18 per stuk); "uit" = alleen
+    // de eerste schatting.
+    "EXPERT_MODEL": "claude-opus-5",
+    "EXPERT_EFFORT": "low",
+    "PRIJSCHECK": "aan",
+    // Route zolang je in de app niets kiest: api | abonnement | lokaal. Abonnement en lokaal hebben een
+    // draaiende agent-pc nodig (docs/AGENT.md).
+    "DEFAULT_BRON": "api",
+    // Optioneel: Cloudflare Access als extra login (zie src/access.js). Leeg = alleen het wachtwoord.
+    "ACCESS_TEAM": "",
+    "ACCESS_AUD": ""
+  },
+  // Secrets (niet hier, maar met `npx wrangler secret put` of `npm run setup`):
+  // APP_PASSWORD, DISCOGS_TOKEN, AGENT_KEY en optioneel ANTHROPIC_API_KEY.
+  "observability": { "enabled": true }
+}

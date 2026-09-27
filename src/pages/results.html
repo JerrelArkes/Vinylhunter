@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Resultaten</title>
+<style>
+  :root {
+    --bg: #f6f5f2; --card: #ffffff; --fg: #1c1b19; --muted: #6f6c66; --line: #e4e1db;
+    --accent: #0a7a47; --accent-bg: #e3f4ea; --warn: #9a5b00; --warn-bg: #fdf0da;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #141413; --card: #1e1d1b; --fg: #eeece8; --muted: #9d9a93; --line: #2f2d2a;
+      --accent: #4fd392; --accent-bg: #173327; --warn: #f0b458; --warn-bg: #3a2b12;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #141413; --card: #1e1d1b; --fg: #eeece8; --muted: #9d9a93; --line: #2f2d2a;
+    --accent: #4fd392; --accent-bg: #173327; --warn: #f0b458; --warn-bg: #3a2b12;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 16px 16px 48px; }
+  h1 { font-size: 22px; margin: 4px 0 2px; letter-spacing: -.01em; }
+  .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  a.cam { background: var(--fg); color: var(--bg); text-decoration: none; font-weight: 600; font-size: 14px; padding: 8px 16px; border-radius: 999px; }
+  .framed a.cam { display: none; }
+  .when { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  button.clear { font: inherit; font-size: 13px; border: 1px solid var(--line); background: var(--card); color: var(--muted); padding: 6px 12px; border-radius: 999px; }
+  .sub { color: var(--muted); font-size: 13px; margin: 0 0 14px; }
+  .bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; background: var(--card); }
+  .seg button { font: inherit; font-size: 13px; border: 0; background: none; color: var(--muted); padding: 6px 12px; }
+  .seg button[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
+  /* Filter per soort: losse knoppen die mogen doorlopen op een tweede regel (zes soorten passen niet
+     naast elkaar op een telefoon). */
+  #kindSeg { flex-wrap: wrap; gap: 4px; border: 0; background: none; overflow: visible; }
+  #kindSeg button { border: 1px solid var(--line); border-radius: 999px; background: var(--card); }
+  #kindSeg button[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+  /* Schakelaar Claude via API of abonnement */
+  .bron { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; margin: 0 0 14px; font-size: 13px; color: var(--muted); }
+  .bron .st.warn { color: var(--warn); font-weight: 600; }
+  .stats { color: var(--muted); font-size: 13px; margin-left: auto; font-variant-numeric: tabular-nums; }
+  ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  li.rec { display: grid; grid-template-columns: 64px 1fr auto; gap: 4px 12px; align-items: center; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px 8px 8px; }
+  li.rec.hot { border-color: var(--accent); box-shadow: inset 4px 0 0 var(--accent); }
+  .thumb { width: 64px; height: 64px; border-radius: 8px; object-fit: cover; background: var(--line); display: block; }
+  .name { font-weight: 600; overflow-wrap: anywhere; }
+  .meta { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+  .meta a { color: inherit; }
+  .price { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .price .range { font-weight: 700; font-size: 16px; }
+  .price .n { font-size: 12px; color: var(--muted); }
+  .badge { display: inline-block; font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 999px; margin-left: 6px; vertical-align: 1px; }
+  .badge.hot { background: var(--accent-bg); color: var(--accent); }
+  .badge.warn { background: var(--warn-bg); color: var(--warn); }
+  .badge.muted { background: var(--line); color: var(--muted); }
+  li.pending { opacity: .7; }
+  /* Onderbouwing bij keramiek en zilver, over de volle breedte onder de rij */
+  details.more { grid-column: 1 / -1; margin: 4px 0 0; font-size: 13px; }
+  details.more summary { color: var(--muted); cursor: pointer; }
+  details.more p { margin: 6px 0; }
+  details.more .k { color: var(--muted); }
+  details.more a { color: inherit; }
+  details.more button.ph { font: inherit; font-size: 12px; border: 1px solid var(--line); background: var(--card); color: var(--fg); padding: 3px 10px; border-radius: 999px; margin-right: 4px; }
+  #failed { margin-top: 20px; }
+  #failed > summary { cursor: pointer; color: var(--muted); font-size: 14px; }
+  #failed ul { margin-top: 8px; }
+  .empty { color: var(--muted); padding: 32px 0; text-align: center; }
+  #err { color: var(--warn); font-size: 13px; }
+  #viewer { position: fixed; inset: 0; background: rgba(0,0,0,.92); display: flex; align-items: center; justify-content: center; z-index: 10; }
+  #viewer[hidden] { display: none; }
+  #viewer img { max-width: 100%; max-height: 100%; object-fit: contain; }
+  #viewer span { position: absolute; top: 12px; right: 16px; color: #fff; font-size: 14px; }
+  @media (max-width: 420px) {
+    li.rec { grid-template-columns: 52px 1fr; }
+    .thumb { width: 52px; height: 52px; }
+    .price { grid-column: 2; text-align: left; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <div class="top"><h1>Resultaten</h1><a class="cam" id="camLink" href="/">Camera</a></div>
+  <p class="sub"><span id="explain"></span> <span id="updated"></span></p>
+  <div class="bron">
+    <span>Claude:</span>
+    <div class="seg" id="bronSeg"><button data-v="api">API · snel</button><button data-v="abonnement">Abonnement</button><button data-v="lokaal">Lokaal model</button></div>
+    <span class="st" id="bronStatus"></span>
+  </div>
+  <div class="bar">
+    <div class="seg" id="kindSeg">
+      <button data-v="alles">Alles</button><button data-v="vinyl">Vinyl</button><button data-v="pokemon">Pokémon</button><button data-v="keramiek">Keramiek</button><button data-v="zilver">Zilver</button><button data-v="overig">Overig</button>
+    </div>
+    <div class="seg" id="sort">
+      <button data-v="new" aria-pressed="true">Nieuwste</button>
+      <button data-v="price" aria-pressed="false">Duurste</button>
+    </div>
+    <span class="stats" id="stats"></span>
+    <button class="clear" id="clearBtn">Leegmaken</button>
+  </div>
+  <p id="err"></p>
+  <ul id="list"></ul>
+  <details id="failed"><summary></summary><ul id="failList"></ul></details>
+</main>
+<div id="viewer" hidden><img id="viewerImg" alt=""><span>tik om te sluiten</span></div>
+<script>
+// Bovenkant van de range vanaf hier: "interessant". Zilver: echt zilver is altijd interessant.
+const HOT = { vinyl: 10, pokemon: 5, keramiek: 25, zilver: 25, overig: 25 };
+const EXPLAIN = {
+  alles: 'Vinyl via Discogs, Pokémon via Cardmarket, keramiek, zilver en overig geschat door Opus aan de hand van je foto\'s.',
+  overig: 'Waarde = schatting van wat het voorwerp bij doorverkoop in Nederland opbrengt, op basis van je foto\'s (merk, typeplaatje, staat). Interessante stukken worden daarna gecheckt met vergelijkbare verkopen op internet.',
+  vinyl: 'Prijs = goedkoopste aanbod over alle persingen tot het duurste van de 3 meest gezochte persingen. De bovenkant wordt aangevuld zodra er geen nieuwe scans wachten.',
+  pokemon: 'Prijs = laagste aanbod tot trendprijs op Cardmarket (via TCGdex), voor de Engelse kaart met hetzelfde nummer. Staat, taal en editie bepalen waar je in die range zit.',
+  keramiek: 'Waarde = schatting van wat het stuk bij doorverkoop in Nederland opbrengt, op basis van je foto\'s. Interessante stukken worden daarna gecheckt met vergelijkbare verkopen op internet.',
+  zilver: 'Waarde = schatting van wat het stuk bij doorverkoop opbrengt; bij echt zilver minimaal rond de smeltwaarde. Interessante stukken worden daarna gecheckt met vergelijkbare verkopen op internet.',
+};
+const NOUN = { alles: 'items', vinyl: 'platen', pokemon: 'kaarten', keramiek: 'stukken', zilver: 'stukken', overig: 'stukken' };
+const $ = id => document.getElementById(id);
+// Binnen de camera-app (tabblad) is de cameraknop overbodig: daar zit de tabbalk.
+if (window.self !== window.top) document.documentElement.classList.add('framed');
+let sort = 'new', kind = 'alles';
+try { kind = localStorage.getItem('vinylhunter-filter') || 'alles'; } catch {}
+if (!EXPLAIN[kind]) kind = 'alles';
+const isExpert = k => k === 'keramiek' || k === 'zilver' || k === 'overig';
+const eur = (n, k) => n == null ? '–' : isExpert(k) ? '€' + Math.round(n) : '€' + n.toFixed(2).replace('.', ',');
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const cap = s => s ? s[0].toUpperCase() + s.slice(1) : '';
+const detailsOf = s => { try { return JSON.parse(s.details || 'null') || {}; } catch { return {}; } };
+const isHot = (s, d) => (s.price_high ?? 0) >= (HOT[s.kind] ?? 10) || d.analyse?.material_verdict === 'echt_zilver';
+// "di 23 sep 16:41"; het jaar alleen als het niet dit jaar is.
+const when = ms => {
+  const d = new Date(ms), opts = { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' };
+  if (d.getFullYear() !== new Date().getFullYear()) opts.year = 'numeric';
+  return `<div class="when">${d.toLocaleString('nl-NL', opts)}</div>`;
+};
+
+function segSet(seg, v) { for (const x of seg.children) x.setAttribute('aria-pressed', x.dataset.v === v); }
+segSet($('kindSeg'), kind);
+$('kindSeg').onclick = e => {
+  const b = e.target.closest('button'); if (!b) return;
+  kind = b.dataset.v; segSet($('kindSeg'), kind);
+  try { localStorage.setItem('vinylhunter-filter', kind); } catch {}
+  load();
+};
+$('sort').onclick = e => {
+  const b = e.target.closest('button'); if (!b) return;
+  sort = b.dataset.v; segSet($('sort'), sort); load();
+};
+
+// API: de Worker vraagt Claude direct (snel, kost per foto). Abonnement: de agent-pc doet het met
+// `claude -p` op het eigen Claude-abonnement (geen kosten per foto, telt voor de 5-uurslimiet).
+// Lokaal: de agent-pc herkent met een lokaal model; keramiek, zilver en overig gaan dan via de API.
+$('bronSeg').onclick = async e => {
+  const b = e.target.closest('button'); if (!b || b.getAttribute('aria-pressed') === 'true') return;
+  const r = await fetch('/api/instellingen', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ bron: b.dataset.v }) });
+  if (!r.ok) { $('err').textContent = 'Omschakelen mislukt: ' + ((await r.json().catch(() => ({}))).error || r.status); return; }
+  showBron(await r.json());
+};
+function showBron(s) {
+  segSet($('bronSeg'), s.bron);
+  const st = $('bronStatus'), wacht = s.wacht ? ` · ${s.wacht} in de wachtrij` : '';
+  let text = 'direct via de API: 2-3 s per foto, ongeveer €0,005 per foto', warn = false;
+  if (s.bron === 'abonnement') {
+    if (s.pauzeTot) { text = `limiet van je abonnement bereikt, verder om ${new Date(s.pauzeTot).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })}${wacht}`; warn = true; }
+    else if (!s.pcKlaar) { text = `agent-pc niet bereikbaar of niet ingelogd: scans wachten${wacht}`; warn = true; }
+    else text = `via de agent-pc: 3-5 s per foto, geen kosten per foto, telt voor je 5-uurslimiet${wacht}`;
+  } else if (s.bron === 'lokaal') {
+    const expert = s.apiSleutel ? 'keramiek, zilver en overig via de API' : 'keramiek, zilver en overig kunnen niet (geen API-sleutel)';
+    if (!s.pcKlaar) { text = `agent-pc niet bereikbaar: scans wachten${wacht}`; warn = true; }
+    else text = `lokaal model op de agent-pc, minder betrouwbaar dan Claude; ${expert}${wacht}`;
+  }
+  st.textContent = text;
+  st.classList.toggle('warn', warn);
+}
+
+$('clearBtn').onclick = async () => {
+  if (!confirm('Alle resultaten van deze pagina halen? Ze worden verborgen, niet gewist.')) return;
+  const r = await fetch('/api/clear', { method: 'POST' });
+  if (!r.ok) { $('err').textContent = 'Leegmaken mislukt: ' + ((await r.json().catch(() => ({}))).error || r.status); return; }
+  load();
+};
+
+// Foto's van keramiek/zilver (30 dagen bewaard) komen als base64-tekst binnen.
+document.addEventListener('click', async e => {
+  const b = e.target.closest('button.ph'); if (!b) return;
+  const r = await fetch(`/api/photo/${b.dataset.id}/${b.dataset.i}`);
+  if (!r.ok) { alert(await r.text()); return; }
+  $('viewerImg').src = 'data:image/jpeg;base64,' + await r.text();
+  $('viewer').hidden = false;
+});
+$('viewer').onclick = () => { $('viewer').hidden = true; $('viewerImg').removeAttribute('src'); };
+
+const thumb = s => s.has_thumb ? `<img class="thumb" loading="lazy" src="/api/thumb/${s.id}" alt="">` : '<div class="thumb"></div>';
+const WAIT = { queued: 'bezig…', uploading: 'versturen…', recognizing: 'bezig…', recognized: 'prijs zoeken…', looking_up: 'prijs zoeken…', wacht_op_pc: 'wacht op de agent-pc…' };
+
+function row(s) {
+  const d = detailsOf(s), k = s.kind || 'vinyl';
+  if (s.status !== 'done') {
+    const label = s.status === 'wacht_op_pc' ? WAIT.wacht_op_pc
+      : isExpert(k) ? 'analyseren…' : { queued: 'herkennen…', recognizing: 'herkennen…' }[s.status] || WAIT[s.status];
+    return `<li class="rec pending">${thumb(s)}<div>${when(s.created_at)}<div class="name">${s.artist ? esc([s.artist, s.title].join(' – ')) : 'Nieuwe scan'}</div><div class="meta">${label}</div></div><div></div></li>`;
+  }
+  if (k === 'pokemon') return pokemonRow(s, d);
+  if (isExpert(k)) return expertRow(s, d);
+  return vinylRow(s);
+}
+
+function vinylRow(s) {
+  const name = s.artist ? `${esc(s.artist)} – ${esc(s.title)}` : 'Onbekend';
+  const hot = (s.price_high ?? 0) >= HOT.vinyl;
+  const thin = s.for_sale != null && s.for_sale <= 2;
+  const badges = (hot ? '<span class="badge hot">interessant</span>' : '')
+    + (s.seen_again ? `<span class="badge muted">${s.seen_again + 1}× gescand</span>` : '');
+  const pending = s.range_status === 'pending' || s.range_status === 'filling';
+  const meta = [
+    s.other_side && `B: ${esc(s.other_side)}`,
+    s.catno && esc(s.catno),
+    s.pressings != null && `${s.pressings} persing${s.pressings === 1 ? '' : 'en'}`,
+    `<a href="${esc(s.discogs_url)}" target="_blank" rel="noopener">Discogs</a>`,
+  ].filter(Boolean).join(' · ');
+  return `<li class="rec${hot ? ' hot' : ''}">${thumb(s)}
+    <div>${when(s.created_at)}<div class="name">${name}${badges}</div><div class="meta">${meta}</div></div>
+    <div class="price"><div class="range">${eur(s.price_low)} – ${pending ? '…' : eur(s.price_high)}</div>
+      <div class="n">${s.for_sale ?? 0} te koop${thin ? ' <span class="badge warn">weinig aanbod</span>' : ''}</div>
+      ${pending ? '<div class="n">bovenkant volgt</div>' : ''}</div></li>`;
+}
+
+function pokemonRow(s, d) {
+  const rec = d.rec || {}, card = d.card || {}, cm = card.cardmarket || {};
+  const hot = (s.price_high ?? 0) >= HOT.pokemon;
+  const badges = (hot ? '<span class="badge hot">interessant</span>' : '')
+    + (rec.first_edition ? '<span class="badge warn">1e editie: kan meer waard zijn</span>' : '')
+    + (card.ambiguous ? '<span class="badge warn">set niet zeker</span>' : '')
+    + (s.seen_again ? `<span class="badge muted">${s.seen_again + 1}× gescand</span>` : '');
+  const meta = [
+    card.rarity && esc(card.rarity),
+    card.priceVariant === 'reverse holo' && 'reverse holo',
+    rec.language && !['en', 'nl'].includes(rec.language) && `taal: ${esc(rec.language)}`,
+    rec.notes && esc(rec.notes),
+    s.discogs_url && `<a href="${esc(s.discogs_url)}" target="_blank" rel="noopener">Cardmarket</a>`,
+  ].filter(Boolean).join(' · ');
+  return `<li class="rec${hot ? ' hot' : ''}">${thumb(s)}
+    <div>${when(s.created_at)}<div class="name">${esc(s.discogs_title || s.artist)}${badges}</div><div class="meta">${meta}</div></div>
+    <div class="price"><div class="range">${eur(s.price_low)} – ${eur(s.price_high)}</div>
+      <div class="n">${cm.avg30 != null ? `30 dagen gem. ${eur(cm.avg30)}` : 'laagste – trend'}</div></div></li>`;
+}
+
+function expertRow(s, d) {
+  const a = d.analyse || {}, p = d.prijscheck || {}, k = s.kind;
+  const hot = isHot(s, d);
+  const verdict = k === 'zilver' ? ({
+    echt_zilver: `<span class="badge hot">echt zilver${a.fineness ? ' ' + a.fineness : ''}</span>`,
+    verzilverd: '<span class="badge muted">verzilverd</span>',
+    onzeker: '<span class="badge warn">zilver onzeker</span>',
+  })[a.material_verdict] || '' : '';
+  const badges = verdict + (hot && !verdict.includes('hot') ? '<span class="badge hot">interessant</span>' : '')
+    + (a.confidence && a.confidence !== 'hoog' ? `<span class="badge warn">zekerheid ${esc(a.confidence)}</span>` : '');
+  const meta = [a.line, a.origin, a.period].filter(Boolean).map(esc).join(' · ');
+  const busy = s.range_status === 'pending' || s.range_status === 'filling';
+  const status = busy ? 'prijscheck volgt' : p.basis ? `gecheckt (${(p.sources || []).length} bronnen)` : s.range_status === 'error' ? 'prijscheck mislukt' : 'schatting uit foto\'s';
+  const melt = d.melt ? `<div class="n">smeltwaarde ≈ ${eur(d.melt, k)}${a.weight_g ? ` (±${Math.round(a.weight_g)} g)` : ''}</div>` : '';
+  const sources = (p.sources || []).map(x => `<br>· <a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.title)}</a> ${esc(x.price)} <span class="k">(${esc(x.kind)})</span>`).join('');
+  const photos = Array.from({ length: s.photos || 0 }, (_, i) => `<button class="ph" data-id="${s.id}" data-i="${i}">foto ${i + 1}</button>`).join('');
+  return `<li class="rec${hot ? ' hot' : ''}">${thumb(s)}
+    <div>${when(s.created_at)}<div class="name">${esc([cap(a.object || s.title), a.maker].filter(Boolean).join(' · ') || 'Onbekend')}${badges}</div><div class="meta">${meta}</div></div>
+    <div class="price"><div class="range">${eur(s.price_low, k)} – ${eur(s.price_high, k)}</div><div class="n">${status}</div>${melt}</div>
+    <details class="more"><summary>Waarom deze waarde</summary>
+      ${a.marks ? `<p><span class="k">Merk/tekens:</span> ${esc(a.marks)}</p>` : ''}
+      ${a.material ? `<p><span class="k">Materiaal:</span> ${esc(a.material)}${a.condition ? ` · <span class="k">staat:</span> ${esc(a.condition)}` : ''}</p>` : ''}
+      <p><span class="k">Eerste schatting (${eur(a.value_low, k)} – ${eur(a.value_high, k)}):</span> ${esc(a.value_basis)}</p>
+      ${p.basis ? `<p><span class="k">Prijscheck:</span> ${esc(p.basis)}${sources}</p>` : ''}
+      ${p.error ? `<p><span class="k">Prijscheck mislukt:</span> ${esc(p.error)}</p>` : ''}
+      ${a.checks ? `<p><span class="k">Nog checken:</span> ${esc(a.checks)}</p>` : ''}
+      ${photos ? `<p>${photos}</p>` : ''}
+    </details></li>`;
+}
+
+function failRow(s) {
+  const k = s.kind || 'vinyl', d = detailsOf(s);
+  const why = ({
+    unclear: isExpert(k) ? 'niet te beoordelen' : 'niet leesbaar',
+    no_record: { vinyl: 'geen plaat', pokemon: 'geen kaart', keramiek: 'geen keramiek', zilver: 'geen zilver', overig: 'geen voorwerp' }[k],
+    not_found: k === 'pokemon' ? 'kaart niet gevonden' : 'niet op Discogs',
+    error: 'fout: ' + esc(s.error),
+  })[s.status];
+  const name = k === 'pokemon' && d.rec ? `${esc(d.rec.name)} ${esc(d.rec.number)}${d.rec.printed_total ? '/' + esc(d.rec.printed_total) : ''}`
+    : s.artist ? esc([s.artist, s.title].filter(Boolean).join(' – ')) : 'Onbekend';
+  return `<li class="rec">${thumb(s)}<div>${when(s.created_at)}<div class="name">${name}</div><div class="meta">${why}</div></div><div></div></li>`;
+}
+
+async function load() {
+  try {
+    const r = await fetch('/api/list');
+    if (r.status === 401) { location.reload(); return; }
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.status);
+    const data = await r.json();
+    showBron(data);
+    const scans = data.scans.filter(s => kind === 'alles' || (s.kind || 'vinyl') === kind);
+    $('err').textContent = '';
+    $('explain').textContent = EXPLAIN[kind];
+    const visible = scans.filter(s => !s.duplicate_of && !['unclear', 'no_record', 'not_found', 'error'].includes(s.status));
+    const failed = scans.filter(s => ['unclear', 'not_found', 'error'].includes(s.status) || (isExpert(s.kind) && s.status === 'no_record'));
+    if (sort === 'price') visible.sort((a, b) => (b.price_high ?? -1) - (a.price_high ?? -1));
+    // Open uitklapblokken open laten bij het verversen (elke 3 s).
+    const open = new Set([...document.querySelectorAll('details.more[open]')].map(x => x.closest('li')?.dataset.id));
+    $('list').innerHTML = visible.length ? visible.map(s => row(s).replace('<li class="rec', `<li data-id="${s.id}" class="rec`)).join('') : '<li class="empty">Nog niets gescand.</li>';
+    for (const id of open) $('list').querySelector(`li[data-id="${id}"] details.more`)?.setAttribute('open', '');
+    $('failed').hidden = !failed.length;
+    $('failed').querySelector('summary').textContent = `Niet gelukt (${failed.length})`;
+    $('failList').innerHTML = failed.map(failRow).join('');
+    const done = visible.filter(s => s.status === 'done');
+    $('stats').textContent = `${done.length} ${NOUN[kind]} · ${done.filter(s => isHot(s, detailsOf(s))).length} interessant`;
+    $('updated').textContent = 'Bijgewerkt ' + new Date().toLocaleTimeString('nl-NL');
+  } catch (e) {
+    $('err').textContent = 'Kon niet verversen: ' + e.message;
+  }
+}
+load();
+setInterval(load, 3000);
+</script>
+</body>
+</html>

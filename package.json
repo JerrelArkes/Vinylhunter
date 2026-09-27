@@ -1,0 +1,20 @@
+{
+  "name": "vinylhunter",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "setup": "node tools/setup.mjs",
+    "agent": "node tools/discogs-agent.mjs",
+    "scan": "node tools/marktplaats-scan.mjs",
+    "dev": "wrangler dev --test-scheduled",
+    "deploy": "wrangler deploy",
+    "secrets:local": "node tools/make-dev-vars.mjs",
+    "zoektest": "node tools/zoektest.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.128.0"
+  },
+  "devDependencies": {
+    "wrangler": "^4.137.0"
+  }
+}

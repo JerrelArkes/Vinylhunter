@@ -1,0 +1,530 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#000000">
+<title>Vinylhunter</title>
+<style>
+  :root { --accent: #3ddc84; --warn: #ffb020; --bad: #ff5c5c; --fg: #fff; --muted: rgba(255,255,255,.65); --panel: rgba(0,0,0,.55); --tabs: 58px; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #000; color: var(--fg); font: 15px/1.35 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; overflow: hidden; }
+  button { font: inherit; }
+
+  /* Twee weergaven boven een vaste tabbalk */
+  .view { position: fixed; top: 0; left: 0; right: 0; bottom: calc(var(--tabs) + env(safe-area-inset-bottom)); overflow: hidden; }
+  .view[hidden] { display: none; }
+  #resultsView { border: 0; width: 100%; height: calc(100% - var(--tabs) - env(safe-area-inset-bottom)); background: #141413; }
+  nav { position: fixed; left: 0; right: 0; bottom: 0; height: calc(var(--tabs) + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom); display: grid; grid-template-columns: 1fr 1fr; background: #111; border-top: 1px solid #2a2a2a; }
+  nav button { border: 0; background: none; color: var(--muted); font-size: 15px; font-weight: 600; }
+  nav button[aria-selected="true"] { color: var(--fg); box-shadow: inset 0 3px 0 var(--accent); }
+  nav .count { display: inline-block; min-width: 20px; padding: 0 6px; margin-left: 6px; border-radius: 999px; background: var(--accent); color: #000; font-size: 12px; line-height: 20px; }
+  nav .count:empty { display: none; }
+
+  #video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  #frame { position: absolute; inset: 0; pointer-events: none; border: 6px solid transparent; transition: border-color .15s; }
+  #frame.steady { border-color: rgba(61,220,132,.5); }
+  #flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; transition: opacity .35s; }
+  #flash.on { opacity: .85; transition: none; }
+  header { position: absolute; top: 0; left: 0; right: 0; padding: max(10px, env(safe-area-inset-top)) 12px 10px; display: flex; flex-direction: column; gap: 6px; }
+  .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .chip { background: var(--panel); padding: 6px 12px; border-radius: 999px; backdrop-filter: blur(6px); }
+  #state { font-weight: 600; }
+  #queue { color: var(--muted); font-size: 13px; }
+  #queue.bad { color: var(--warn); }
+  #queue:empty { display: none; }
+  /* Schakelaar API / abonnement / lokaal: tik om te wisselen (was eerst alleen een label; in de test
+     van 2026-09-25 werd erop getikt en gebeurde er niets). */
+  #bron { border: 0; color: var(--fg); font: inherit; font-size: 13px; font-weight: 600; }
+  #bron.bad { color: var(--warn); }
+  #bron:empty { display: none; }
+  #bron:disabled { opacity: .6; }
+  .spacer { flex: 1; }
+  #stopBtn { border: 0; color: var(--fg); background: rgba(255,92,92,.85); padding: 7px 14px; border-radius: 999px; font-weight: 600; font-size: 14px; }
+  #recent { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+  #recent li { background: var(--panel); border-radius: 10px; padding: 6px 10px; display: flex; gap: 8px; align-items: baseline; backdrop-filter: blur(6px); }
+  #recent li .t { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #recent li .p { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+  #recent li.hot .p { color: var(--accent); }
+  #recent li.pending { color: var(--muted); }
+  #recent li.fail { color: var(--muted); font-style: italic; }
+  footer { position: absolute; left: 0; right: 0; bottom: 0; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .toggle { background: var(--panel); color: var(--fg); border: 0; border-radius: 999px; padding: 10px 14px; font-size: 14px; min-width: 88px; backdrop-filter: blur(6px); }
+  .toggle[aria-pressed="false"] { color: var(--muted); text-decoration: line-through; }
+  #shutter { width: 78px; height: 78px; border-radius: 50%; border: 5px solid #fff; background: rgba(255,255,255,.25); flex: none; }
+  #shutter:active { background: rgba(255,255,255,.7); }
+  /* Modusknop is een stand (Auto / Handmatig), geen aan/uit: geen streep. In handmatig is de ronde
+     knop de enige manier om te fotograferen, dus groter en groen. */
+  #autoBtn[aria-pressed="false"] { color: var(--fg); text-decoration: none; }
+  #autoBtn:disabled { opacity: .45; }
+  body.manual #shutter { width: 88px; height: 88px; border-color: var(--accent); background: rgba(61,220,132,.3); }
+  body.manual #shutter:active { background: rgba(61,220,132,.75); }
+  #shutter:disabled { opacity: .35; }
+  /* Soort (Vinyl / Pokémon / Keramiek / Zilver) boven de knoppen; bij keramiek en zilver daarboven
+     het bakje met de foto's van het stuk dat je aan het fotograferen bent. */
+  #kindsWrap { position: absolute; left: 0; right: 0; bottom: 122px; display: flex; justify-content: center; padding: 0 8px; }
+  #kinds { display: inline-flex; gap: 2px; padding: 3px; border-radius: 999px; background: var(--panel); backdrop-filter: blur(6px); }
+  #kinds button { border: 0; background: none; color: var(--muted); padding: 8px 9px; border-radius: 999px; font-size: 13px; font-weight: 600; }
+  #kinds button[aria-pressed="true"] { background: var(--fg); color: #000; }
+  #tray { position: absolute; left: 12px; right: 12px; bottom: 176px; display: flex; align-items: center; gap: 8px; padding: 8px; border-radius: 14px; background: var(--panel); backdrop-filter: blur(6px); }
+  #tray[hidden] { display: none; }
+  #trayImgs { display: flex; gap: 6px; }
+  #trayImgs img { width: 46px; height: 46px; object-fit: cover; border-radius: 8px; display: block; }
+  #trayHint { flex: 1; min-width: 0; font-size: 13px; color: var(--muted); }
+  #tray button { border: 0; border-radius: 999px; padding: 10px 14px; font-weight: 700; font-size: 14px; }
+  #trayCancel { background: rgba(255,255,255,.15); color: var(--fg); }
+  #traySend { background: var(--accent); color: #000; }
+  #start { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; background: #000; text-align: center; padding: 24px; }
+  #start[hidden] { display: none; }
+  #start button { font-size: 18px; font-weight: 600; padding: 16px 32px; border-radius: 999px; border: 0; background: var(--accent); color: #000; }
+  #start p { color: var(--muted); max-width: 32ch; margin: 0; }
+  #debug { position: absolute; right: 8px; bottom: 120px; background: var(--panel); font: 12px ui-monospace, monospace; padding: 4px 8px; border-radius: 6px; display: none; }
+  body.debug #debug { display: block; }
+  #err { color: var(--bad); }
+</style>
+</head>
+<body>
+<section class="view" id="camView">
+  <video id="video" playsinline muted></video>
+  <div id="frame"></div>
+  <div id="flash"></div>
+
+  <header>
+    <div class="row">
+      <span class="chip" id="state">Camera uit</span>
+      <span class="chip" id="queue"></span>
+      <button class="chip" id="bron" title="Tik om te wisselen: API, abonnement of lokaal model"></button>
+      <span class="spacer"></span>
+      <button id="stopBtn">Stop</button>
+    </div>
+    <ul id="recent"></ul>
+  </header>
+
+  <div id="debug"></div>
+
+  <div id="tray" hidden>
+    <div id="trayImgs"></div>
+    <span id="trayHint"></span>
+    <button id="trayCancel" aria-label="Foto's weggooien">✕</button>
+    <button id="traySend">Klaar</button>
+  </div>
+
+  <div id="kindsWrap">
+    <div id="kinds" role="group" aria-label="Soort">
+      <button data-k="vinyl">Vinyl</button><button data-k="pokemon">Pokémon</button><button data-k="keramiek">Keramiek</button><button data-k="zilver">Zilver</button><button data-k="overig">Overig</button>
+    </div>
+  </div>
+
+  <footer>
+    <button class="toggle" id="autoBtn" aria-pressed="false">Handmatig</button>
+    <button id="shutter" aria-label="Foto maken"></button>
+    <button class="toggle" id="soundBtn" aria-pressed="true">Geluid</button>
+  </footer>
+
+  <div id="start">
+    <p id="startText">Kies onderin wat je scant: <b>Vinyl</b>, <b>Pokémon</b>, <b>Keramiek</b>, <b>Zilver</b> of <b>Overig</b> (al het andere). De app start in <b>Handmatig</b>: tik op de ronde knop voor een foto. Bij vinyl en Pokémon kan linksonder ook <b>Auto</b>: dan fotografeert de app zelf zodra er iets nieuws stil in beeld is. Bij keramiek, zilver en overig maak je een paar foto's van één stuk (geheel, dan bodem, keurtekens of typeplaatje) en tik je op <b>Klaar</b>.</p>
+    <button id="startBtn">Start camera</button>
+    <p id="err"></p>
+  </div>
+</section>
+
+<iframe class="view" id="resultsView" hidden title="Resultaten"></iframe>
+
+<nav role="tablist">
+  <button role="tab" id="tabCam" aria-selected="true">Camera</button>
+  <button role="tab" id="tabRes" aria-selected="false">Resultaten<span class="count" id="newCount"></span></button>
+</nav>
+
+<script>
+// ---- frame-selectie v2 (afstellen in de winkel; ?debug toont de waarden) ----
+// Drempels gemeten op de 29 testfoto's (verschil van 32x24-signaturen, 0-255):
+//   trillende hand 3-10, iets zoomen 7-15, zelfde hoes anders in beeld 19,5,
+//   andere hoes 18,5-58; contrast hoes 25-55, leeg laken 7.
+const TICK_MS = 100;          // analyse-interval
+const SETTLE_TICKS = 2;       // zo vaak achter elkaar rustig (~0,2 s) voordat we schieten
+const SETTLE_MIN = 4, SETTLE_MAX = 9;  // grenzen voor de aanpassende "rustig"-drempel
+const NOVEL = 16;             // minimaal verschil met de laatste foto's om "nieuwe hoes" te zijn
+const MEMORY = 6;             // met zoveel vorige foto's vergelijken (ook terugbladeren telt niet)
+const MIN_CONTRAST = 20;      // minder contrast = geen hoes in beeld (leeg vlak, donker)
+// Bewust gretig: liever een dubbele foto dan een gemiste plaat. De server ontdubbelt direct na de
+// herkenning op artiest+titel (besluit na de winkeltest van 2026-09-24).
+const THUMB_SIDE = 240;
+// Per soort: fotogrootte (lange zijde) en JPEG-kwaliteit, of Auto kan, en bij keramiek/zilver de stappen
+// voor de foto's van één stuk. Pokémon groter dan vinyl: het kaartnummer is klein. Keramiek en zilver
+// 1400 px: stempels en keurtekens zijn klein, maar tot 4 grotere foto's per upload is zwaar voor de Worker.
+const KIND = {
+  vinyl: { side: 1024, q: .82, auto: true, what: 'hoes' },
+  pokemon: { side: 1280, q: .85, auto: true, what: 'kaart' },
+  keramiek: { side: 1400, q: .85, steps: ['Foto 1: het hele stuk', 'Foto 2: de bodem met het merk', 'Nog een detail, of tik Klaar'] },
+  zilver: { side: 1400, q: .85, steps: ['Foto 1: het hele stuk', 'Foto 2: close-up van de keurtekens', 'Nog een close-up, of tik Klaar'] },
+  overig: { side: 1400, q: .85, steps: ['Foto 1: het hele object', 'Foto 2: merk, typeplaatje of label', 'Nog een detail, of tik Klaar'] },
+};
+const MAX_PHOTOS = 4;
+const HOT = { vinyl: 10, pokemon: 5, keramiek: 25, zilver: 25, overig: 25 };   // bovenkant vanaf hier: groen
+const isExpert = k => k === 'keramiek' || k === 'zilver' || k === 'overig';     // foto-analyse door Opus
+
+const $ = id => document.getElementById(id);
+const video = $('video');
+if (new URLSearchParams(location.search).has('debug')) document.body.classList.add('debug');
+
+let stream = null, tickTimer = null, wakeLock = null, audioCtx = null;
+let auto = false, sound = true, view = 'cam', kind = 'vinyl';
+let tray = [];                // foto's van het stuk (keramiek/zilver) tot "Klaar"
+let prev = null, stillTicks = 0, motionHist = [];
+const recentSigs = [];        // signaturen van de laatste MEMORY foto's
+let seenDone = new Set(), unseen = 0;
+const sessionStart = Date.now();
+const pending = [];           // uploads die nog weg moeten (alleen in geheugen)
+
+// Eerst naar 320x240 tekenen en dan zelf middelen naar 32x24: in één stap verkleinen gaf
+// zoveel ruis dat een trillende hand als beweging telde en er nooit geschoten werd.
+const big = document.createElement('canvas'); big.width = 320; big.height = 240;
+const bctx = big.getContext('2d', { willReadFrequently: true });
+bctx.imageSmoothingQuality = 'high';
+
+let holdUntil = 0;
+function setState(text, holdMs = 0) {
+  if (!holdMs && Date.now() < holdUntil) return;   // "Gepakt!" even laten staan
+  $('state').textContent = text;
+  holdUntil = holdMs ? Date.now() + holdMs : 0;
+}
+
+// ---------- camera aan/uit ----------
+async function startCamera() {
+  $('err').textContent = '';
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false,
+    });
+    video.srcObject = stream;
+    await video.play();
+    $('start').hidden = true;
+    audioCtx ??= new (window.AudioContext || window.webkitAudioContext)();
+    await keepAwake();
+    prev = null; stillTicks = 0; motionHist = [];
+    tickTimer = setInterval(tick, TICK_MS);
+    setState(modeText());
+  } catch (e) {
+    $('err').textContent = 'Camera niet beschikbaar: ' + e.message;
+  }
+}
+
+function stopCamera() {
+  clearInterval(tickTimer); tickTimer = null;
+  stream?.getTracks().forEach(t => t.stop()); stream = null;
+  video.srcObject = null;
+  wakeLock?.release().catch(() => {}); wakeLock = null;
+  $('frame').classList.remove('steady');
+  $('startText').textContent = 'Camera staat uit.';
+  $('start').hidden = false;
+  setState('Camera uit');
+}
+
+async function keepAwake() {
+  try { wakeLock = await navigator.wakeLock?.request('screen'); } catch {}
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && stream) keepAwake();
+});
+
+// ---------- tabs ----------
+function show(v) {
+  view = v;
+  $('tabCam').setAttribute('aria-selected', v === 'cam');
+  $('tabRes').setAttribute('aria-selected', v === 'res');
+  $('camView').hidden = v !== 'cam';
+  $('resultsView').hidden = v !== 'res';
+  if (v === 'res') {
+    if (!$('resultsView').src) $('resultsView').src = '/resultaten';
+    unseen = 0; $('newCount').textContent = '';
+  } else {
+    prev = null; stillTicks = 0;   // opnieuw beginnen na terugkomen
+  }
+}
+
+// ---------- frame-selectie ----------
+// Signatuur: 32x24 grijswaarden, gemiddelde eraf (belichting verspringt), met contrast (sd).
+function grab() {
+  bctx.drawImage(video, 0, 0, 320, 240);
+  const d = bctx.getImageData(0, 0, 320, 240).data;
+  const sig = new Float32Array(32 * 24);
+  for (let y = 0; y < 240; y++) {
+    const row = ((y / 10) | 0) * 32;
+    for (let x = 0; x < 320; x++) {
+      const i = (y * 320 + x) * 4;
+      sig[row + ((x / 10) | 0)] += (d[i] * .3 + d[i + 1] * .59 + d[i + 2] * .11) / 100;
+    }
+  }
+  let mean = 0; for (const v of sig) mean += v; mean /= sig.length;
+  let sd = 0; for (let i = 0; i < sig.length; i++) { sig[i] -= mean; sd += sig[i] * sig[i]; }
+  sig.sd = Math.sqrt(sd / sig.length);
+  return sig;
+}
+function diff(a, b) { let s = 0; for (let i = 0; i < a.length; i++) s += Math.abs(a[i] - b[i]); return s / a.length; }
+const noveltyOf = sig => recentSigs.length ? Math.min(...recentSigs.map(s => diff(sig, s))) : 99;
+
+function tick() {
+  // Gepauzeerd op de resultatentab, en in handmatig (dan fotografeert alleen de ronde knop; spaart accu).
+  if (!video.videoWidth || view !== 'cam' || !auto) return;
+  const g = grab();
+  const motion = prev ? diff(g, prev) : 99;
+  prev = g;
+  // "Rustig" past zich aan aan hoe stil de telefoon wordt gehouden: de rustigste momenten van
+  // de laatste 3 s (20e percentiel) plus marge, binnen vaste grenzen.
+  motionHist.push(motion); if (motionHist.length > 30) motionHist.shift();
+  const floor = [...motionHist].sort((a, b) => a - b)[Math.floor(motionHist.length * .2)] ?? 0;
+  const settle = Math.min(SETTLE_MAX, Math.max(SETTLE_MIN, floor * 1.8 + 2));
+  stillTicks = motion < settle ? stillTicks + 1 : 0;
+  const novelty = noveltyOf(g);
+  const isNew = novelty >= NOVEL, hasRecord = g.sd >= MIN_CONTRAST;
+  $('frame').classList.toggle('steady', auto && isNew && hasRecord && stillTicks >= 1);
+  $('debug').textContent = `beweging ${motion.toFixed(1)}/${settle.toFixed(1)}  nieuw ${novelty.toFixed(1)}  contrast ${g.sd.toFixed(0)}`;
+
+  if (!hasRecord) setState(`Geen ${KIND[kind].what || 'stuk'} in beeld`);
+  else if (!isNew) setState('Al gefotografeerd');
+  else if (stillTicks >= SETTLE_TICKS) capture('auto', g);
+  else setState('Stil houden…');
+}
+
+function toJpeg(side, quality) {
+  const w = video.videoWidth, h = video.videoHeight, s = side / Math.max(w, h);
+  const c = document.createElement('canvas'); c.width = Math.round(w * s); c.height = Math.round(h * s);
+  c.getContext('2d').drawImage(video, 0, 0, c.width, c.height);
+  return c.toDataURL('image/jpeg', quality).split(',')[1];
+}
+
+function capture(source, sig) {
+  if (!stream) return;
+  const k = KIND[kind];
+  if (k.steps && tray.length >= MAX_PHOTOS) return;
+  // Ook een knopfoto telt mee, zodat auto dezelfde hoes niet nog eens pakt.
+  const s = sig || grab();
+  recentSigs.push(s); if (recentSigs.length > MEMORY) recentSigs.shift();
+  const image = toJpeg(k.side, k.q);
+  feedback();
+  if (k.steps) {
+    // Keramiek/zilver: foto's van één stuk verzamelen tot "Klaar"; de eerste wordt de thumbnail.
+    tray.push({ image, thumb: tray.length ? null : toJpeg(THUMB_SIDE, .7), preview: 'data:image/jpeg;base64,' + toJpeg(96, .6) });
+    renderTray();
+    return;
+  }
+  setState('Gepakt!', 900);
+  pending.push({ kind, image, thumb: toJpeg(THUMB_SIDE, .7), source, feat: features(s), taken_at: Date.now(), tries: 0 });
+  upload();
+}
+
+function renderTray() {
+  $('tray').hidden = !tray.length;
+  $('trayImgs').innerHTML = tray.map(p => `<img src="${p.preview}" alt="">`).join('');
+  $('traySend').textContent = `Klaar (${tray.length})`;
+  $('trayHint').textContent = tray.length >= MAX_PHOTOS ? `Maximaal ${MAX_PHOTOS} foto's` : '';
+  $('shutter').disabled = !!KIND[kind].steps && tray.length >= MAX_PHOTOS;
+  if (stream) setState(modeText());
+}
+
+function sendTray() {
+  if (!tray.length) return;
+  pending.push({ kind, image: tray[0].image, extra: tray.slice(1).map(p => p.image), thumb: tray[0].thumb, source: 'knop', taken_at: Date.now(), tries: 0 });
+  tray = [];
+  renderTray();
+  setState('Verstuurd, analyse loopt', 1500);
+  upload();
+}
+
+// Kenmerken waarmee de server een tweede foto van dezelfde hoes herkent vóór de (betaalde) herkenning:
+// de grijsafdruk van grab() en een kleurhistogram (tint 12 x verzadiging 3 x helderheid 3) uit het
+// 320x240-beeld dat grab() net tekende. Gekalibreerd op de scans van 2026-09-24 (zie ARCHITECTURE).
+// Zelfde berekening als featuresFromPixels() in src/twin.js: wijzig je de ene, wijzig dan ook de andere.
+function features(sig) {
+  const d = bctx.getImageData(0, 0, 320, 240).data;
+  const h = new Array(108).fill(0);
+  let n = 0;
+  for (let y = 2; y < 240; y += 5) for (let x = 2; x < 320; x += 5) {
+    const i = (y * 320 + x) * 4, r = d[i] / 255, g = d[i + 1] / 255, b = d[i + 2] / 255;
+    const mx = Math.max(r, g, b), dd = mx - Math.min(r, g, b);
+    let hue = 0;
+    if (dd) hue = mx === r ? ((g - b) / dd + 6) % 6 : mx === g ? (b - r) / dd + 2 : (r - g) / dd + 4;
+    const sat = mx ? dd / mx : 0;
+    h[Math.min(11, (hue * 2) | 0) * 9 + Math.min(2, (sat * 3) | 0) * 3 + Math.min(2, (mx * 3) | 0)]++;
+    n++;
+  }
+  return { s: Array.from(sig, v => Math.round(v * 10) / 10), h: h.map(v => Math.round(v / n * 1e4) / 1e4) };
+}
+
+function feedback() {
+  const f = $('flash'); f.classList.add('on'); requestAnimationFrame(() => requestAnimationFrame(() => f.classList.remove('on')));
+  navigator.vibrate?.(80);
+  if (sound && audioCtx) {
+    const o = audioCtx.createOscillator(), gn = audioCtx.createGain();
+    o.frequency.value = 1320; gn.gain.setValueAtTime(.25, audioCtx.currentTime);
+    gn.gain.exponentialRampToValueAtTime(.001, audioCtx.currentTime + .15);
+    o.connect(gn).connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime + .16);
+  }
+}
+
+// ---------- versturen ----------
+let uploading = false;
+function queueMsg(text, bad = false) { $('queue').textContent = text; $('queue').classList.toggle('bad', bad); }
+
+async function upload() {
+  if (uploading) return;
+  uploading = true;
+  while (pending.length) {
+    const item = pending[0];
+    queueMsg(pending.length > 1 ? `${pending.length} te versturen` : 'versturen…');
+    try {
+      const r = await fetch('/api/scan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(item) });
+      if (r.ok) { pending.shift(); pollRecent(); continue; }
+      const msg = (await r.json().catch(() => ({}))).error || `serverfout ${r.status}`;
+      if (r.status === 401) { queueMsg('Uitgelogd: herlaad de pagina', true); uploading = false; return; }
+      item.tries++;
+      queueMsg(`${pending.length} niet verstuurd: ${msg}`, true);
+    } catch {
+      item.tries++;
+      queueMsg(`${pending.length} wachten op verbinding`, true);
+    }
+    await new Promise(res => setTimeout(res, Math.min(30000, 2000 * item.tries)));
+  }
+  queueMsg('');
+  uploading = false;
+}
+
+// ---------- laatste resultaten bovenin ----------
+// Keramiek en zilver zijn schattingen: hele euro's. Vinyl en Pokémon: marktprijzen met centen.
+const eur = (n, k) => n == null ? '–' : isExpert(k) ? '€' + Math.round(n) : '€' + n.toFixed(2).replace('.', ',');
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const cap = s => s ? s[0].toUpperCase() + s.slice(1) : '';
+const detailsOf = s => { try { return JSON.parse(s.details || 'null') || {}; } catch { return {}; } };
+const isHot = (s, d) => (s.price_high ?? 0) >= (HOT[s.kind] ?? 10) || d.analyse?.material_verdict === 'echt_zilver';
+function nameOf(s, d) {
+  if (s.kind === 'pokemon') return esc(s.discogs_title || [s.artist, s.title].filter(Boolean).join(' '));
+  if (isExpert(s.kind)) {
+    const a = d.analyse || {};
+    const verdict = a.material_verdict === 'echt_zilver' ? `Echt zilver${a.fineness ? ' ' + a.fineness : ''} · `
+      : a.material_verdict === 'verzilverd' ? 'Verzilverd · ' : '';
+    return esc(verdict + [cap(s.title), s.artist].filter(Boolean).join(' · '));
+  }
+  return s.artist ? `${esc(s.artist)} – ${esc(s.title)}` : '';
+}
+const WAIT = { vinyl: 'Herkennen…', pokemon: 'Herkennen…', keramiek: 'Analyseren…', zilver: 'Analyseren…', overig: 'Analyseren…' };
+// Knop bovenin: via welke route het model draait (API, abonnement of lokaal), tik om door te schakelen.
+// Waarschuwing als er scans wachten en de agent-pc niet meedoet (dan is wisselen naar API de uitweg).
+let bronNu = null, apiSleutel = true;
+const BRON_LABEL = { api: 'API', abonnement: 'Abonnement', lokaal: 'Lokaal' };
+function showBron(s) {
+  const el = $('bron');
+  bronNu = s.bron;
+  apiSleutel = s.apiSleutel !== false;
+  if (s.bron === 'api') {
+    el.textContent = 'API';
+    el.classList.remove('bad');
+    return;
+  }
+  const problem = s.pauzeTot && s.bron === 'abonnement' ? 'limiet bereikt' : !s.pcKlaar ? 'pc niet bereikbaar' : '';
+  el.textContent = [BRON_LABEL[s.bron], problem, s.wacht ? `${s.wacht} wachten` : ''].filter(Boolean).join(' · ');
+  el.classList.toggle('bad', !!problem && s.wacht > 0);
+}
+$('bron').onclick = async () => {
+  if (!bronNu) return;
+  // Volgende route; API overslaan als er geen sleutel is ingesteld.
+  const volgorde = ['api', 'abonnement', 'lokaal'].filter(b => b !== 'api' || apiSleutel);
+  const naar = volgorde[(volgorde.indexOf(bronNu) + 1) % volgorde.length];
+  const el = $('bron');
+  el.disabled = true;
+  try {
+    const r = await fetch('/api/instellingen', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ bron: naar }) });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `serverfout ${r.status}`);
+    showBron(await r.json());
+    setState({ api: 'Claude via de API: snel, kost per foto', abonnement: 'Claude via je abonnement op de agent-pc', lokaal: 'Lokaal model op de agent-pc' }[naar], 2500);
+  } catch (e) {
+    setState('Wisselen mislukt: ' + e.message, 3000);
+  } finally {
+    el.disabled = false;
+  }
+};
+const FAIL = {
+  unclear: { vinyl: 'Niet leesbaar', pokemon: 'Niet leesbaar', keramiek: 'Niet te beoordelen', zilver: 'Niet te beoordelen', overig: 'Niet te beoordelen' },
+  no_record: { vinyl: 'Geen plaat', pokemon: 'Geen kaart', keramiek: 'Geen keramiek', zilver: 'Geen zilver', overig: 'Geen voorwerp' },
+  not_found: { vinyl: 'Niet op Discogs', pokemon: 'Kaart niet gevonden' },
+  error: {},
+};
+
+async function pollRecent() {
+  try {
+    const r = await fetch('/api/recent?since=' + sessionStart);
+    if (!r.ok) return;
+    const data = await r.json(), { scans } = data;
+    showBron(data);
+    for (const s of scans) {
+      if (s.status === 'done' && !s.duplicate_of && !seenDone.has(s.id)) {
+        seenDone.add(s.id);
+        if (view !== 'res') { unseen++; $('newCount').textContent = unseen; }
+      }
+    }
+    $('recent').innerHTML = scans.slice(0, 4).map(s => {
+      const k = s.kind || 'vinyl', d = detailsOf(s), name = nameOf(s, d);
+      if (s.status === 'done' && s.duplicate_of) return `<li class="pending"><span class="t">${name}</span><span class="p">al gezien</span></li>`;
+      if (s.status === 'done') {
+        // Vinyl: bovenkant volgt nog. Keramiek/zilver: de prijscheck kan de hele range nog bijstellen.
+        const busy = ['pending', 'filling'].includes(s.range_status);
+        const high = busy && k === 'vinyl' ? '…' : eur(s.price_high, k);
+        return `<li class="${isHot(s, d) ? 'hot' : ''}"><span class="t">${name}</span><span class="p">${eur(s.price_low, k)}–${high}${busy && k !== 'vinyl' ? ' …' : ''}</span></li>`;
+      }
+      if (s.status === 'wacht_op_pc') return `<li class="pending"><span class="t">Wacht op de agent-pc…</span></li>`;
+      if (['uploading', 'queued', 'recognizing'].includes(s.status)) return `<li class="pending"><span class="t">${WAIT[k]}</span></li>`;
+      if (['recognized', 'looking_up'].includes(s.status)) return `<li class="pending"><span class="t">${name}</span><span class="p">prijs…</span></li>`;
+      const why = FAIL[s.status]?.[k] || (s.status === 'error' ? 'Fout' : s.status);
+      return `<li class="fail"><span class="t">${name || why}</span><span class="p">${name ? why : ''}</span></li>`;
+    }).join('');
+  } catch {}
+}
+setInterval(pollRecent, 4000);
+pollRecent();
+
+$('startBtn').onclick = startCamera;
+$('stopBtn').onclick = stopCamera;
+$('shutter').onclick = () => capture('knop');
+// Modus: Auto (de app fotografeert zelf) of Handmatig (alleen de ronde knop). De app opent altijd in
+// Handmatig (besluit 2026-09-25: Auto was de standaard en maakte ongevraagd foto's). Keramiek en
+// zilver kennen alleen Handmatig: daar maak je bewust een paar foto's van één stuk.
+const modeText = () => {
+  const k = KIND[kind];
+  if (k.steps) return k.steps[Math.min(tray.length, k.steps.length - 1)];
+  return auto ? 'Zoeken…' : 'Handmatig: tik op de ronde knop';
+};
+function setMode(isAuto) {
+  auto = isAuto && !!KIND[kind].auto;
+  $('autoBtn').textContent = auto ? 'Auto' : 'Handmatig';
+  $('autoBtn').setAttribute('aria-pressed', auto);
+  $('autoBtn').disabled = !KIND[kind].auto;
+  document.body.classList.toggle('manual', !auto);
+  $('frame').classList.remove('steady');
+  prev = null; stillTicks = 0; motionHist = [];      // bij terug naar Auto opnieuw beginnen met meten
+  if (stream) setState(modeText(), 1500);
+}
+// Soort: wel onthouden, zodat de app na herladen niet ineens keramiek als vinyl stuurt.
+function setKind(k, first = false) {
+  if (!KIND[k] || (k === kind && !first)) return;
+  if (tray.length && !confirm(`${tray.length} foto('s) van dit stuk weggooien?`)) return;
+  tray = [];
+  kind = k;
+  for (const b of $('kinds').children) b.setAttribute('aria-pressed', b.dataset.k === kind);
+  recentSigs.length = 0;
+  setMode(false);
+  renderTray();
+  try { localStorage.setItem('vinylhunter-soort', kind); } catch {}
+}
+let savedKind = null;
+try { savedKind = localStorage.getItem('vinylhunter-soort'); } catch {}
+setKind(KIND[savedKind] ? savedKind : 'vinyl', true);
+$('kinds').onclick = e => { const b = e.target.closest('button'); if (b) setKind(b.dataset.k); };
+$('traySend').onclick = sendTray;
+$('trayCancel').onclick = () => { tray = []; renderTray(); };
+$('autoBtn').onclick = () => setMode(!auto);
+$('soundBtn').onclick = e => { sound = !sound; e.target.setAttribute('aria-pressed', sound); };
+$('tabCam').onclick = () => show('cam');
+$('tabRes').onclick = () => show('res');
+</script>
+</body>
+</html>

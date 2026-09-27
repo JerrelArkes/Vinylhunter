@@ -1,0 +1,30 @@
+# Sleutels en persoonlijke instellingen
+agent.env
+*.env
+.env*
+*.env.txt
+agent-key.txt
+apify-token.txt
+.dev.vars
+# Door `npm run setup` gemaakt uit wrangler.example.jsonc (bevat je database-ID)
+wrangler.jsonc
+# Werkbestanden
+node_modules/
+.wrangler/
+.claude-agent/
+agent-cache.json
+agent.log*
+*.log
+*.log.*
+tools/zoektest-cache.json
+# Marktplaats-scan (advertentieteksten en verkopersnamen)
+marktplaats/
+# Eigen testfoto's
+testset/
+# Lokale instellingen van editors en Claude Code
+.claude/settings.local.json
+CLAUDE.local.md
+.vscode/
+.npmrc
+*.sqlite
+*.pem
